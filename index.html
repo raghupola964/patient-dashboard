@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Patient Data Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.6.8/dist/axios.min.js"></script>
+  <script src="https://www.gstatic.com/charts/loader.js"></script>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      background-color: #f9fafb;
+      margin: 0;
+    }
+    .sidebar {
+      background-color: white;
+      width: 200px;
+      border-right: 1px solid #e5e7eb;
+      padding: 16px;
+    }
+    .patient-list {
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .patient-item {
+      padding: 8px 0;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .patient-item.active {
+      background-color: #e5e7eb;
+      border-radius: 8px;
+      padding-left: 8px;
+    }
+    .patient-item p {
+      margin: 0;
+    }
+    .card {
+      background-color: white;
+      border-radius: 16px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .graph-container {
+      width: 100%;
+      max-width: 700px;
+      height: 200px;
+    }
+    .metric-card {
+      border-radius: 16px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .respiratory { background-color: #e6f0fa; }
+    .temperature { background-color: #fee2e2; }
+    .heart-rate { background-color: #fce7f3; }
+    .diagnostic-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .diagnostic-table th, .diagnostic-table td {
+      padding: 8px;
+      text-align: left;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .lab-results {
+      padding: 16px;
+    }
+    .lab-results div {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    @media (max-width: 1024px) {
+      .sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid #e5e7eb;
+      }
+      .patient-list {
+        display: flex;
+        flex-wrap: wrap;
+        max-height: none;
+      }
+      .patient-item {
+        flex: 1 1 100%;
+      }
+      .main-content {
+        padding: 12px;
+      }
+      .graph-container {
+        max-width: 100%;
+        height: 200px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="flex flex-col min-h-screen">
+      <header class="bg-white shadow-sm p-4 flex justify-between items-center">
+        <div class="flex items-center space-x-2">
+          <img src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=24&h=24&fit=crop" alt="TechCare Logo" class="w-6 h-6" onerror="this.src='https://via.placeholder.com/24x24.png?text=🏥';"/>
+          <h1 class="text-lg font-semibold text-gray-800">TechCare</h1>
+        </div>
+        <nav class="flex space-x-4">
+          <a href="#" class="text-gray-600 hover:text-gray-800" aria-label="Overview">Overview</a>
+          <a href="#" class="text-gray-600 hover:text-gray-800 flex items-center" aria-label="Patients">
+            <span class="mr-1">Patients</span>
+            <span class="w-5 h-5 bg-teal-100 text-teal-600 rounded-full flex items-center justify-center text-xs">2</span>
+          </a>
+          <a href="#" class="text-gray-600 hover:text-gray-800" aria-label="Schedule">Schedule</a>
+          <a href="#" class="text-gray-600 hover:text-gray-800" aria-label="Message">Message</a>
+          <a href="#" class="text-gray-600 hover:text-gray-800" aria-label="Transactions">Transactions</a>
+        </nav>
+        <div class="flex items-center space-x-2">
+          <span class="text-gray-600">Dr. Jose Simmons</span>
+          <span class="text-gray-500 text-sm">General Practitioner</span>
+          <div class="w-8 h-8 bg-gray-300 rounded-full" aria-label="User avatar"></div>
+        </div>
+      </header>
+      <div id="content" class="flex flex-1">
+        <div class="text-center p-4">Loading...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    console.log("Starting application...");
+
+    // Mock data with monthly blood pressure data for the last 6 months
+    const mockData = {
+      name: "Jessica Taylor",
+      age: 28,
+      gender: "Female",
+      date_of_birth: "August 23, 1996",
+      phone_number: "(415) 555-1234",
+      emergency_contact: "(415) 555-5678",
+      insurance_provider: "Sunrise Health Assurance",
+      diagnosis_history: [
+        { month: "Mar", year: 2024, blood_pressure: { systolic: { value: 160, levels: "Higher than Average" }, diastolic: { value: 78, levels: "Lower than Average" } }, respiratory_rate: { value: 20, levels: "Normal" }, temperature: { value: 98.6, levels: "Normal" }, heart_rate: { value: 78, levels: "Lower than Average" } },
+        { month: "Feb", year: 2024, blood_pressure: { systolic: { value: 155, levels: "Normal" }, diastolic: { value: 80, levels: "Normal" } }, respiratory_rate: { value: 21, levels: "Normal" }, temperature: { value: 98.7, levels: "Normal" }, heart_rate: { value: 77, levels: "Normal" } },
+        { month: "Jan", year: 2024, blood_pressure: { systolic: { value: 150, levels: "Normal" }, diastolic: { value: 76, levels: "Normal" } }, respiratory_rate: { value: 22, levels: "Normal" }, temperature: { value: 98.5, levels: "Normal" }, heart_rate: { value: 79, levels: "Normal" } },
+        { month: "Dec", year: 2023, blood_pressure: { systolic: { value: 145, levels: "Normal" }, diastolic: { value: 75, levels: "Normal" } }, respiratory_rate: { value: 20, levels: "Normal" }, temperature: { value: 98.6, levels: "Normal" }, heart_rate: { value: 80, levels: "Normal" } },
+        { month: "Nov", year: 2023, blood_pressure: { systolic: { value: 120, levels: "Normal" }, diastolic: { value: 80, levels: "Normal" } }, respiratory_rate: { value: 19, levels: "Normal" }, temperature: { value: 98.4, levels: "Normal" }, heart_rate: { value: 76, levels: "Normal" } },
+        { month: "Oct", year: 2023, blood_pressure: { systolic: { value: 125, levels: "Normal" }, diastolic: { value: 82, levels: "Normal" } }, respiratory_rate: { value: 20, levels: "Normal" }, temperature: { value: 98.6, levels: "Normal" }, heart_rate: { value: 78, levels: "Normal" } }
+      ],
+      diagnostic_list: [
+        { problem_diagnosis: "Hypertension", description: "Chronic high blood pressure", status: "Under Observation" },
+        { problem_diagnosis: "Type 2 Diabetes", description: "Insulin resistance and elevated blood sugar", status: "Cured" },
+        { problem_diagnosis: "Asthma", description: "Recurrent episodes of bronchial constriction", status: "Inactive" }
+      ],
+      lab_results: ["Blood Tests", "CT Scans", "Radiology Reports", "X-Rays", "Urine Test"]
+    };
+
+    // Encode Basic Auth credentials
+    const username = 'coalition';
+    const password = 'skills-test';
+    const token = btoa(`${username}:${password}`);
+    console.log("Basic Auth token generated");
+
+    let patientData = mockData; // Default to mock data to ensure UI loads
+    let bpData = {
+      systolic: mockData.diagnosis_history.map(h => h.blood_pressure.systolic.value),
+      diastolic: mockData.diagnosis_history.map(h => h.blood_pressure.diastolic.value),
+      months: mockData.diagnosis_history.map(h => `${h.month} ${h.year}`)
+    };
+
+    // Render the UI immediately with mock data to prevent an empty screen
+    function renderContent(data, error = null) {
+      console.log("Rendering content with data:", data);
+      if (error) {
+        document.getElementById('content').innerHTML = `<div class="text-center p-4 text-yellow-500">${error} - Displaying mock data</div>`;
+      }
+
+      const latestMetrics = data.diagnosis_history[0];
+      document.getElementById('content').innerHTML = `
+        <aside class="sidebar">
+          <h2 class="text-lg font-semibold mb-4 text-gray-800 flex items-center">
+            <span>Patients</span>
+            <svg class="w-5 h-5 ml-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+          </h2>
+          <div class="patient-list">
+            ${["Emily Williams", "Ryan Johnson", "Brandon Mitchell", "Jessica Taylor", "Samantha Johnson", "Ashley Martinez", "Olivia Brown", "Tyler Davis", "Kevin Anderson", "Dylan Thompson", "Nathan Evans", "Mike Nolan"].map((name, idx) => `
+              <div class="patient-item ${name === 'Jessica Taylor' ? 'active' : ''}">
+                <div>
+                  <p class="text-gray-800 font-medium">${name}</p>
+                  <p class="text-gray-500 text-sm">${idx % 2 === 0 ? 'Female' : 'Male'}, ${18 + idx * 4}</p>
+                </div>
+                <svg class="w-4 h-4 text-gray-500 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+              </div>
+            `).join('')}
+          </div>
+        </aside>
+        <main class="main-content flex-1 p-6">
+          <div class="flex justify-between items-start mb-6">
+            <div>
+              <h2 class="text-2xl font-semibold text-gray-800">Diagnosis History</h2>
+            </div>
+            <div class="text-right">
+              <h2 class="text-xl font-semibold text-gray-800">Jessica Taylor</h2>
+              <p class="text-gray-600">Date of Birth: ${data.date_of_birth}</p>
+              <p class="text-gray-600">Gender: ${data.gender}</p>
+              <p class="text-gray-600">Contact Info.: ${data.phone_number}</p>
+              <p class="text-gray-600">Emergency Contacts: ${data.emergency_contact}</p>
+              <p class="text-gray-600">Insurance Provider: ${data.insurance_provider}</p>
+              <button class="mt-2 bg-teal-100 text-teal-600 px-4 py-2 rounded-full text-sm">Show All Information</button>
+            </div>
+          </div>
+          <section class="mb-6">
+            <div class="card p-6">
+              <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-800">Blood Pressure</h3>
+                <div class="flex items-center space-x-2">
+                  <span class="text-gray-600">Last 6 months</span>
+                  <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </div>
+              </div>
+              <div class="graph-container" id="graphContainer">
+                <div id="bpChart" aria-label="Blood pressure trend chart"></div>
+              </div>
+              <div class="flex space-x-6 mt-4">
+                <div>
+                  <p class="text-pink-400 font-semibold">Systolic</p>
+                  <p class="text-2xl font-bold">${latestMetrics.blood_pressure.systolic.value}</p>
+                  <p class="text-gray-600">${latestMetrics.blood_pressure.systolic.levels}</p>
+                </div>
+                <div>
+                  <p class="text-blue-400 font-semibold">Diastolic</p>
+                  <p class="text-2xl font-bold">${latestMetrics.blood_pressure.diastolic.value}</p>
+                  <p class="text-gray-600">${latestMetrics.blood_pressure.diastolic.levels}</p>
+                </div>
+              </div>
+            </div>
+          </section>
+          <section class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="metric-card respiratory">
+              <svg class="w-10 h-10 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+              <div>
+                <p class="text-gray-600">Respiratory Rate</p>
+                <p class="text-2xl font-bold">${latestMetrics.respiratory_rate.value} bpm</p>
+                <p class="text-gray-600">${latestMetrics.respiratory_rate.levels}</p>
+              </div>
+            </div>
+            <div class="metric-card temperature">
+              <svg class="w-10 h-10 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m0-4a2 2 0 100-4 2 2 0 000 4z"></path></svg>
+              <div>
+                <p class="text-gray-600">Temperature</p>
+                <p class="text-2xl font-bold">${latestMetrics.temperature.value}°F</p>
+                <p class="text-gray-600">${latestMetrics.temperature.levels}</p>
+              </div>
+            </div>
+            <div class="metric-card heart-rate">
+              <svg class="w-10 h-10 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+              <div>
+                <p class="text-gray-600">Heart Rate</p>
+                <p class="text-2xl font-bold">${latestMetrics.heart_rate.value} bpm</p>
+                <p class="text-gray-600">${latestMetrics.heart_rate.levels}</p>
+              </div>
+            </div>
+          </section>
+          <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="card">
+              <h3 class="text-lg font-semibold text-gray-800 p-4">Diagnostic List</h3>
+              <table class="diagnostic-table">
+                <thead>
+                  <tr>
+                    <th>Problem/Diagnosis</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${data.diagnostic_list.map(diag => `
+                    <tr>
+                      <td>${diag.problem_diagnosis}</td>
+                      <td>${diag.description}</td>
+                      <td>${diag.status}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+            <div class="card">
+              <h3 class="text-lg font-semibold text-gray-800 p-4">Lab Results</h3>
+              <div class="lab-results">
+                ${data.lab_results.map(result => `
+                  <div>
+                    <p>${result}</p>
+                    <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 15l8 8 8-8"></path></svg>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </section>
+        </main>
+      `;
+    }
+
+    // Load Google Charts and render the chart
+    console.log("Loading Google Charts...");
+    google.charts.load('current', { packages: ['corechart'] });
+    google.charts.setOnLoadCallback(() => {
+      console.log("Google Charts loaded successfully");
+
+      // Render the UI immediately with mock data
+      console.log("Rendering initial UI with mock data...");
+      renderContent(mockData);
+
+      // Initialize the chart
+      console.log("Initializing Google Charts with data:", bpData);
+      try {
+        const chartData = new google.visualization.DataTable();
+        chartData.addColumn('string', 'Month');
+        chartData.addColumn('number', 'Systolic');
+        chartData.addColumn('number', 'Diastolic');
+
+        for (let i = 0; i < bpData.months.length; i++) {
+          chartData.addRow([bpData.months[i], bpData.systolic[i], bpData.diastolic[i]]);
+        }
+
+        const options = {
+          height: 200,
+          width: '100%',
+          chartArea: { width: '80%', height: '70%' },
+          legend: { position: 'none' },
+          hAxis: { title: '', gridlines: { count: 0 } },
+          vAxis: { title: '', minValue: 60, maxValue: 180, gridlines: { count: 7, color: '#e5e7eb' } },
+          series: {
+            0: { color: '#f472b6', lineWidth: 2, pointSize: 10, pointShape: 'circle', curveType: 'function' },
+            1: { color: '#60a5fa', lineWidth: 2, pointSize: 10, pointShape: 'circle', curveType: 'function' }
+          }
+        };
+
+        const chart = new google.visualization.LineChart(document.getElementById('bpChart'));
+        chart.draw(chartData, options);
+        console.log("Google Charts initialized successfully");
+      } catch (chartError) {
+        console.error("Google Charts Error:", chartError.message);
+        document.getElementById('graphContainer').innerHTML = '<div class="text-center p-4 text-red-500">Failed to render chart: ' + chartError.message + '</div>';
+      }
+    });
+
+    // Fallback if Google Charts fails to load within a timeout
+    setTimeout(() => {
+      if (typeof google === 'undefined' || typeof google.charts === 'undefined') {
+        console.error("Google Charts not loaded within 5 seconds. Rendering UI with mock data and error message.");
+        renderContent(mockData);
+        document.getElementById('graphContainer').innerHTML = '<div class="text-center p-4 text-red-500">Google Charts failed to load. Please check your internet connection or CDN availability.</div>';
+      }
+    }, 5000);
+
+    // Fetch data and update if possible
+    console.log("Fetching patient data...");
+    axios.get('https://fedskillstest.coalitiontechnologies.workers.dev', {
+      headers: { 'Authorization': `Basic ${token}` }
+    })
+      .then(response => {
+        console.log("API response received:", response.data);
+        patientData = response.data.find(p => p.name === 'Jessica Taylor') || mockData;
+
+        // Extract blood pressure for the last 6 months
+        const history = patientData.diagnosis_history?.slice(0, 6) || mockData.diagnosis_history;
+        const systolic = history.map(h => h.blood_pressure.systolic.value);
+        const diastolic = history.map(h => h.blood_pressure.diastolic.value);
+        const months = history.map(h => `${h.month} ${h.year}`);
+        bpData = { systolic, diastolic, months };
+        console.log("Data processed:", bpData);
+
+        // Re-render the UI with updated data
+        renderContent(patientData);
+
+        // Re-initialize the chart with updated data if Google Charts is loaded
+        if (typeof google !== 'undefined' && typeof google.charts !== 'undefined') {
+          console.log("Re-initializing Google Charts with updated data:", bpData);
+          try {
+            const chartData = new google.visualization.DataTable();
+            chartData.addColumn('string', 'Month');
+            chartData.addColumn('number', 'Systolic');
+            chartData.addColumn('number', 'Diastolic');
+
+            for (let i = 0; i < bpData.months.length; i++) {
+              chartData.addRow([bpData.months[i], bpData.systolic[i], bpData.diastolic[i]]);
+            }
+
+            const options = {
+              height: 200,
+              width: '100%',
+              chartArea: { width: '80%', height: '70%' },
+              legend: { position: 'none' },
+              hAxis: { title: '', gridlines: { count: 0 } },
+              vAxis: { title: '', minValue: 60, maxValue: 180, gridlines: { count: 7, color: '#e5e7eb' } },
+              series: {
+                0: { color: '#f472b6', lineWidth: 2, pointSize: 10, pointShape: 'circle', curveType: 'function' },
+                1: { color: '#60a5fa', lineWidth: 2, pointSize: 10, pointShape: 'circle', curveType: 'function' }
+              }
+            };
+
+            const chart = new google.visualization.LineChart(document.getElementById('bpChart'));
+            chart.draw(chartData, options);
+            console.log("Google Charts re-initialized successfully with API data");
+          } catch (chartError) {
+            console.error("Google Charts Re-initialization Error:", chartError.message);
+            document.getElementById('graphContainer').innerHTML = '<div class="text-center p-4 text-red-500">Failed to render chart with API data: ' + chartError.message + '</div>';
+          }
+        }
+      })
+      .catch(err => {
+        console.error("API Error:", err.message);
+        // UI is already rendered with mock data, so no action needed
+      });
+  </script>
+</body>
+</html>
