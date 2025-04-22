@@ -41,16 +41,9 @@ This project is a patient dashboard built for a Coalition Technologies skills te
 
 ## API Usage
 
-- The dashboard fetches patient data from the API endpoint `https://fedskillstest.coalitiontechnologies.workers.dev` using Basic Auth (username: `coalition`, password: `skills-test`).
+- The dashboard fetches patient data from the API endpoint `https://fedskillstest.coalitiontechnologies.workers.dev` using Basic Auth (username: `xxxxxxx`, password: `xxxxxxxx`).
 - If the API fails, the app falls back to mock data to ensure functionality.
 
-## Screenshots
-
-*(You can add a screenshot of the dashboard here by taking a screenshot and uploading it to the repository. For now, this section is a placeholder.)*
-
-## Live Demo
-
-*(You can host the project on GitHub Pages or another platform and add the link here. For now, this section is a placeholder.)*
 
 ## License
 
